@@ -1,6 +1,7 @@
 #include "leptjson.h"
 #include <assert.h>  /* assert() */
 #include <stdlib.h>  /* NULL */
+#include <string.h>  /* strlen() */
 
 #define EXPECT(c, ch)       do { assert(*c->json == (ch)); c->json++; } while(0)
 
@@ -45,11 +46,50 @@ static int lept_parse_false(lept_context* c, lept_value* v) {
 	v->type = LEPT_FALSE;
 	return LEPT_PARSE_OK;
 }
+
+static int lept_parse_literal(lept_context* c, lept_value* v, const char* ch, lept_type tp) {
+	switch (*ch) {
+	case 'n': {
+		EXPECT(c, 'n');
+		if (c->json[0] != 'u' || c->json[1] != 'l' || c->json[2] != 'l') {
+			return LEPT_PARSE_INVALID_VALUE;
+		}
+		c->json += 3;
+		v->type = LEPT_NULL;
+		return 0;
+		break;
+	}
+	case 't': {
+		EXPECT(c, 't');
+		if (c->json[0] != 'r' || c->json[1] != 'u' || c->json[2] != 'e') {
+			return LEPT_PARSE_INVALID_VALUE;
+		}
+		c->json += 3;
+		v->type = LEPT_TRUE;
+		return LEPT_PARSE_OK;
+	}
+	case 'f': {
+		EXPECT(c, 'f');
+		if (c->json[0] != 'a' || c->json[1] != 'l' || c->json[2] != 's' || c->json[3] != 'e') {
+			return LEPT_PARSE_INVALID_VALUE;
+		}
+		c->json += 4;
+		v->type = LEPT_FALSE;
+		return LEPT_PARSE_OK;
+	}
+	default:
+		break;
+	}
+}
+
 static int lept_parse_number(lept_context* c, lept_value* v) {
 	char* end;
 	v->n = strtod(c->json, &end);
-	if (c->json == end)
+	int length = strlen(c->json);
+	if (c->json == end || *(c->json) == '+' || *(c->json) == '.' || *(c->json+length-1)=='.' || *(c->json) == 'I' || *(c->json) =='i' || *(c->json) == 'N' || *(c->json) == 'n') {
 		return LEPT_PARSE_INVALID_VALUE;
+	}
+	
 	c->json = end;
 	v->type = LEPT_NUMBER;
 	return LEPT_PARSE_OK;
@@ -59,6 +99,7 @@ static int lept_parse_value(lept_context* c, lept_value* v) {
 	switch (*c->json) {
 	case 'n':
 		return lept_parse_null(c, v);
+		//return lept_parse_literal(c, v, "null", LEPT_TRUE);
 	case '\0':
 		return LEPT_PARSE_EXPECT_VALUE;
 	case 't':
@@ -66,7 +107,7 @@ static int lept_parse_value(lept_context* c, lept_value* v) {
 	case 'f':
 		return lept_parse_false(c, v);
 	default:
-		return lept_parse_number(c,v);
+		return lept_parse_number(c, v);
 	}
 }
 
@@ -113,7 +154,7 @@ lept_type lept_get_type(const lept_value* v) {
 	return v->type;
 }
 
-double lept_get_number(const lept_value* v ) {
+double lept_get_number(const lept_value* v) {
 	assert(v != NULL && v->type == LEPT_NUMBER);
 	return v->n;
 }
